@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">AgriAI</string>
+
+    <string name="facebook_app_id">229563269117239</string>
+
+    <string name="facebook_client_token">623346d0e8c7e35b8c2bf1c47a179be4</string>
+
+    <string name="fb_login_protocol_scheme">fb229563269117239</string>
+
+</resources>

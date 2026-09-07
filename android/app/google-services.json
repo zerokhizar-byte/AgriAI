@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1017607357742",
+    "project_id": "agriai-8704e",
+    "storage_bucket": "agriai-8704e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1017607357742:android:9dc56e138803fdc9ece6bf",
+        "android_client_info": {
+          "package_name": "com.example.agriai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1017607357742-89squbipdcv1bi4ls3p6u2me6j71hspq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.agriai",
+            "certificate_hash": "28da38845263db7aaf01dde51853b794758752ef"
+          }
+        },
+        {
+          "client_id": "1017607357742-hl9uksg4jgn3gurvco781pue31vhp727.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDC30VmjN1sk5bnWfXFjzyA3b6zq6iR4Ys"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1017607357742-hl9uksg4jgn3gurvco781pue31vhp727.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1017607357742-6t39jcnmeticcf3esqpc2ahudoqqn1c5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.agriai"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

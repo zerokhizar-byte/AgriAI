@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Test-Path lib\\\\farmer_dashboard\\.dart; Test-Path lib\\\\login_screen\\.dart; Test-Path lib\\\\firebase_options\\.dart; Test-Path lib\\\\localization\\\\app_language\\.dart; Test-Path lib\\\\localization\\\\language_provider\\.dart; Get-Content -Raw \\.dart_tool\\\\package_config\\.json \\| Select-String 'firebase\\|provider\\|shared_preferences'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
