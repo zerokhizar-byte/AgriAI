@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -133,31 +134,137 @@ class _RegisterScreenState
       _isLoading = true;
     });
 
-    await Future<void>.delayed(
-      const Duration(milliseconds: 900),
-    );
+    final String name =
+        _nameController.text.trim();
 
+    final String email =
+        _emailController.text.trim();
+
+    final String password =
+        _passwordController.text;
+
+    try {
+      final UserCredential credential =
+          await FirebaseAuth.instance
+              .createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final User? user = credential.user;
+
+      if (user != null) {
+        await user.updateDisplayName(name);
+
+        await user.sendEmailVerification();
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      widget.onRegisterSuccess?.call();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Account created successfully. '
+            'Verification email sent to $email.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      await Future<void>.delayed(
+        const Duration(seconds: 2),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showAuthError(
+        _firebaseErrorMessage(e),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showAuthError(
+        'Something went wrong. Please try again.',
+      );
+    }
+  }
+
+  String _firebaseErrorMessage(
+    FirebaseAuthException error,
+  ) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'An account already exists with this email.';
+
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+
+      case 'weak-password':
+        return 'The password is too weak.';
+
+      case 'operation-not-allowed':
+        return 'Email/password authentication is not enabled.';
+
+      case 'network-request-failed':
+        return 'Please check your internet connection.';
+
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+
+      default:
+        return error.message ??
+            'Unable to create account. Please try again.';
+    }
+  }
+
+  void _showAuthError(String message) {
     if (!mounted) {
       return;
     }
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    widget.onRegisterSuccess?.call();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Account created successfully',
-        ),
+      SnackBar(
+        content: Text(message),
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
   void _goBackToLogin() {
+    if (_isLoading) {
+      return;
+    }
+
     Navigator.of(context).pop();
   }
 
@@ -169,9 +276,8 @@ class _RegisterScreenState
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          onPressed: _isLoading
-              ? null
-              : _goBackToLogin,
+          onPressed:
+              _isLoading ? null : _goBackToLogin,
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
           ),
@@ -276,8 +382,7 @@ class _RegisterScreenState
                       Icons.lock_outline_rounded,
                   suffixIcon:
                       _obscurePassword
-                          ? Icons
-                              .visibility_outlined
+                          ? Icons.visibility_outlined
                           : Icons
                               .visibility_off_outlined,
                   onSuffixIconPressed: () {
@@ -305,8 +410,7 @@ class _RegisterScreenState
                       Icons.lock_reset_outlined,
                   suffixIcon:
                       _obscureConfirmPassword
-                          ? Icons
-                              .visibility_outlined
+                          ? Icons.visibility_outlined
                           : Icons
                               .visibility_off_outlined,
                   onSuffixIconPressed: () {
@@ -335,8 +439,7 @@ class _RegisterScreenState
                             : (value) {
                                 setState(() {
                                   _acceptTerms =
-                                      value ??
-                                          false;
+                                      value ?? false;
                                 });
                               },
                         activeColor:
@@ -344,19 +447,17 @@ class _RegisterScreenState
                         shape:
                             RoundedRectangleBorder(
                           borderRadius:
-                              BorderRadius.circular(
-                            5,
-                          ),
+                              BorderRadius.circular(5),
                         ),
                       ),
                     ),
+
                     const SizedBox(width: 8),
+
                     const Expanded(
                       child: Padding(
                         padding:
-                            EdgeInsets.only(
-                          top: 2,
-                        ),
+                            EdgeInsets.only(top: 2),
                         child: Text(
                           'I agree to the Terms and Conditions and Privacy Policy.',
                           style: TextStyle(
@@ -364,8 +465,8 @@ class _RegisterScreenState
                             height: 1.4,
                             fontWeight:
                                 FontWeight.w500,
-                            color: AppColors
-                                .textSecondary,
+                            color:
+                                AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -380,9 +481,7 @@ class _RegisterScreenState
                   height: 52,
                   child: ElevatedButton(
                     onPressed:
-                        _isLoading
-                            ? null
-                            : _register,
+                        _isLoading ? null : _register,
                     style:
                         ElevatedButton.styleFrom(
                       backgroundColor:
@@ -398,9 +497,7 @@ class _RegisterScreenState
                       shape:
                           RoundedRectangleBorder(
                         borderRadius:
-                            BorderRadius.circular(
-                          15,
-                        ),
+                            BorderRadius.circular(15),
                       ),
                     ),
                     child: AnimatedSwitcher(
@@ -426,8 +523,7 @@ class _RegisterScreenState
                                 'register',
                               ),
                               mainAxisAlignment:
-                                  MainAxisAlignment
-                                      .center,
+                                  MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons
@@ -465,6 +561,7 @@ class _RegisterScreenState
                             AppColors.textSecondary,
                       ),
                     ),
+
                     TextButton(
                       onPressed: _isLoading
                           ? null
@@ -474,8 +571,7 @@ class _RegisterScreenState
                         foregroundColor:
                             AppColors.primary,
                         padding:
-                            const EdgeInsets
-                                .symmetric(
+                            const EdgeInsets.symmetric(
                           horizontal: 6,
                         ),
                       ),

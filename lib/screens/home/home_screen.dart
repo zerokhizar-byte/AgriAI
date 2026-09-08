@@ -5,12 +5,14 @@ import '../../core/theme/app_dimensions.dart';
 
 class HomeScreen extends StatelessWidget {
   final String? farmerName;
+
   final VoidCallback? onYieldPrediction;
   final VoidCallback? onDiseaseDetection;
   final VoidCallback? onSoilAnalysis;
   final VoidCallback? onWeather;
   final VoidCallback? onRecommendations;
   final VoidCallback? onProfile;
+  final VoidCallback? onCropHistory;
 
   const HomeScreen({
     super.key,
@@ -21,23 +23,25 @@ class HomeScreen extends StatelessWidget {
     this.onWeather,
     this.onRecommendations,
     this.onProfile,
+    this.onCropHistory,
   });
 
   @override
   Widget build(BuildContext context) {
-    final name =
+    final String name =
         farmerName?.trim().isNotEmpty == true
             ? farmerName!.trim()
             : 'Farmer';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
+    return Container(
+      color: AppColors.background,
+      child: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async {
             await Future<void>.delayed(
-              const Duration(milliseconds: 500),
+              const Duration(milliseconds: 400),
             );
           },
           child: CustomScrollView(
@@ -49,49 +53,39 @@ class HomeScreen extends StatelessWidget {
                   20,
                   12,
                   20,
-                  28,
+                  30,
                 ),
                 sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _HomeHeader(
-                      farmerName: name,
-                      onProfile: onProfile,
-                    ),
-                    const SizedBox(height: 18),
-                    _WelcomeCard(
-                      farmerName: name,
-                    ),
-                    const SizedBox(height: 18),
-                    const _SectionTitle(
-                      title: 'Today at a Glance',
-                    ),
-                    const SizedBox(height: 10),
-                    const _WeatherCard(),
-                    const SizedBox(height: 12),
-                    const _FarmStatusCard(),
-                    const SizedBox(height: 20),
-                    const _SectionTitle(
-                      title: 'Quick Actions',
-                    ),
-                    const SizedBox(height: 10),
-                    _QuickActionsGrid(
-                      onYieldPrediction:
-                          onYieldPrediction,
-                      onDiseaseDetection:
-                          onDiseaseDetection,
-                      onSoilAnalysis:
-                          onSoilAnalysis,
-                      onWeather: onWeather,
-                    ),
-                    const SizedBox(height: 20),
-                    const _SectionTitle(
-                      title: 'Smart Recommendation',
-                    ),
-                    const SizedBox(height: 10),
-                    _RecommendationCard(
-                      onTap: onRecommendations,
-                    ),
-                  ]),
+                  delegate: SliverChildListDelegate(
+                    [
+                      _HomeHeader(
+                        farmerName: name,
+                        onProfile: onProfile,
+                      ),
+                      const SizedBox(height: 20),
+                      const _WeatherCard(),
+                      const SizedBox(height: 24),
+                      const _SectionTitle(
+                        title: 'Quick Access',
+                      ),
+                      const SizedBox(height: 12),
+                      _QuickAccessGrid(
+                        onYieldPrediction:
+                            onYieldPrediction,
+                        onDiseaseDetection:
+                            onDiseaseDetection,
+                        onSoilAnalysis:
+                            onSoilAnalysis,
+                        onWeather:
+                            onWeather,
+                        onRecommendations:
+                            onRecommendations,
+                        onCropHistory:
+                            onCropHistory,
+                      ),
+                      const SizedBox(height: 25),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -121,48 +115,60 @@ class _HomeHeader extends StatelessWidget {
                 CrossAxisAlignment.start,
             children: [
               const Text(
-                'Good day,',
+                'Hello, Farmer! 👋',
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 5),
               Text(
-                farmerName,
-                maxLines: 1,
+                farmerName == 'Farmer'
+                    ? 'What would you like to do today?'
+                    : 'Good to see you again, $farmerName.',
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(width: 12),
         Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onProfile,
-            borderRadius:
-                BorderRadius.circular(50),
+            borderRadius: BorderRadius.circular(50),
             child: Container(
-              width: 46,
-              height: 46,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 color: AppColors.cardGreen,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.border,
+                  width: 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.shadow.withValues(
+                      alpha: 0.05,
+                    ),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.person_outline_rounded,
+                size: 26,
                 color: AppColors.primary,
-                size: 23,
               ),
             ),
           ),
@@ -172,81 +178,200 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
-class _WelcomeCard extends StatelessWidget {
-  final String farmerName;
-
-  const _WelcomeCard({
-    required this.farmerName,
-  });
+class _WeatherCard extends StatelessWidget {
+  const _WeatherCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(19),
+      padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(
-          AppDimensions.radius22,
+          AppDimensions.radius18,
+        ),
+        border: Border.all(
+          color: AppColors.border,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(
-              alpha: 0.16,
+            color: AppColors.shadow.withValues(
+              alpha: 0.06,
             ),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+          Row(
+            crossAxisAlignment:
+                CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppColors.cardGreen,
+                  borderRadius:
+                      BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.wb_sunny_rounded,
+                  size: 32,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 13),
+              const Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '28°C',
+                    style: TextStyle(
+                      fontSize: 27,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Partly Cloudy',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                width: 1,
+                height: 50,
+                color: AppColors.divider,
+              ),
+              const SizedBox(width: 13),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Location',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Aurangabad,\nMaharashtra',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: AppColors.divider,
+          ),
+          const SizedBox(height: 12),
+          const Row(
+            children: [
+              Expanded(
+                child: _WeatherDetail(
+                  icon: Icons.water_drop_outlined,
+                  label: 'Humidity',
+                  value: '65%',
+                ),
+              ),
+              SizedBox(
+                width: 1,
+                height: 24,
+                child: ColoredBox(
+                  color: AppColors.divider,
+                ),
+              ),
+              Expanded(
+                child: _WeatherDetail(
+                  icon: Icons.air_rounded,
+                  label: 'Wind',
+                  value: '12 km/h',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeatherDetail extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _WeatherDetail({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: AppColors.primary,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: RichText(
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            text: TextSpan(
               children: [
-                const Text(
-                  'Your farm, smarter.',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Use AI-powered insights to make better decisions for your crops.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.45,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(
-                      alpha: 0.88,
-                    ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(
-                alpha: 0.14,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.eco_rounded,
-              color: Colors.white,
-              size: 31,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -260,223 +385,75 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textPrimary,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
 }
 
-class _WeatherCard extends StatelessWidget {
-  const _WeatherCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(
-          AppDimensions.radius18,
-        ),
-        border: Border.all(
-          color: AppColors.border,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.cardGreen,
-              borderRadius:
-                  BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.wb_sunny_outlined,
-              color: AppColors.primary,
-              size: 25,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Weather',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Check current conditions',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textMuted,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FarmStatusCard extends StatelessWidget {
-  const _FarmStatusCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(
-          AppDimensions.radius18,
-        ),
-        border: Border.all(
-          color: AppColors.border,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _StatusItem(
-              icon: Icons.water_drop_outlined,
-              title: 'Soil',
-              value: 'Analysis',
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 42,
-            color: AppColors.divider,
-          ),
-          Expanded(
-            child: _StatusItem(
-              icon: Icons.eco_outlined,
-              title: 'Crop',
-              value: 'Health',
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 42,
-            color: AppColors.divider,
-          ),
-          Expanded(
-            child: _StatusItem(
-              icon: Icons.insights_outlined,
-              title: 'Yield',
-              value: 'Prediction',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-
-  const _StatusItem({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          size: 21,
-          color: AppColors.primary,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickActionsGrid extends StatelessWidget {
+class _QuickAccessGrid extends StatelessWidget {
   final VoidCallback? onYieldPrediction;
   final VoidCallback? onDiseaseDetection;
   final VoidCallback? onSoilAnalysis;
   final VoidCallback? onWeather;
+  final VoidCallback? onRecommendations;
+  final VoidCallback? onCropHistory;
 
-  const _QuickActionsGrid({
+  const _QuickAccessGrid({
     this.onYieldPrediction,
     this.onDiseaseDetection,
     this.onSoilAnalysis,
     this.onWeather,
+    this.onRecommendations,
+    this.onCropHistory,
   });
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
+    final List<_QuickAction> actions = [
       _QuickAction(
-        icon: Icons.analytics_outlined,
-        title: 'Yield Prediction',
+        icon: Icons.eco_rounded,
+        title: 'Crop Yield\nPrediction',
         subtitle: 'Predict crop yield',
         onTap: onYieldPrediction,
       ),
       _QuickAction(
-        icon: Icons.local_florist_outlined,
-        title: 'Disease Detection',
+        icon: Icons.local_florist_rounded,
+        title: 'Disease\nDetection',
         subtitle: 'Check plant health',
         onTap: onDiseaseDetection,
       ),
       _QuickAction(
-        icon: Icons.water_drop_outlined,
-        title: 'Soil Analysis',
-        subtitle: 'Analyze soil',
+        icon: Icons.inventory_2_outlined,
+        title: 'Fertilizer\nRecommendation',
+        subtitle: 'Get fertilizer advice',
+        onTap: onRecommendations,
+      ),
+      _QuickAction(
+        icon: Icons.water_drop_rounded,
+        title: 'Irrigation\nAdvisor',
+        subtitle: 'Smart irrigation',
         onTap: onSoilAnalysis,
       ),
       _QuickAction(
-        icon: Icons.cloud_outlined,
-        title: 'Weather',
+        icon: Icons.wb_cloudy_rounded,
+        title: 'Weather\nForecast',
         subtitle: 'View forecast',
         onTap: onWeather,
+      ),
+      _QuickAction(
+        icon: Icons.history_rounded,
+        title: 'Crop\nHistory',
+        subtitle: 'View farm history',
+        onTap: onCropHistory,
       ),
     ];
 
@@ -488,12 +465,15 @@ class _QuickActionsGrid extends StatelessWidget {
       gridDelegate:
           const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 11,
-        mainAxisSpacing: 11,
-        childAspectRatio: 1.55,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.98,
       ),
-      itemBuilder: (context, index) {
-        return _QuickActionCard(
+      itemBuilder: (
+        BuildContext context,
+        int index,
+      ) {
+        return _QuickAccessCard(
           action: actions[index],
         );
       },
@@ -515,10 +495,10 @@ class _QuickAction {
   });
 }
 
-class _QuickActionCard extends StatelessWidget {
+class _QuickAccessCard extends StatelessWidget {
   final _QuickAction action;
 
-  const _QuickActionCard({
+  const _QuickAccessCard({
     required this.action,
   });
 
@@ -528,51 +508,67 @@ class _QuickActionCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: action.onTap,
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(19),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(
+            12,
+            14,
+            12,
+            12,
+          ),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius:
-                BorderRadius.circular(17),
+                BorderRadius.circular(19),
             border: Border.all(
               color: AppColors.border,
+              width: 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadow.withValues(
+                  alpha: 0.05,
+                ),
+                blurRadius: 13,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment:
-                CrossAxisAlignment.start,
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+                CrossAxisAlignment.center,
             children: [
               Container(
-                width: 39,
-                height: 39,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   color: AppColors.cardGreen,
                   borderRadius:
-                      BorderRadius.circular(11),
+                      BorderRadius.circular(16),
                 ),
                 child: Icon(
                   action.icon,
-                  size: 20,
+                  size: 29,
                   color: AppColors.primary,
                 ),
               ),
               const Spacer(),
               Text(
                 action.title,
-                maxLines: 1,
+                textAlign: TextAlign.center,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  height: 1.15,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 5),
               Text(
                 action.subtitle,
+                textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -580,95 +576,6 @@ class _QuickActionCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendationCard extends StatelessWidget {
-  final VoidCallback? onTap;
-
-  const _RecommendationCard({
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(
-          AppDimensions.radius18,
-        ),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(17),
-          decoration: BoxDecoration(
-            color: AppColors.cardGreen,
-            borderRadius: BorderRadius.circular(
-              AppDimensions.radius18,
-            ),
-            border: Border.all(
-              color: AppColors.border,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: const Icon(
-                  Icons.lightbulb_outline_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Smart Recommendations',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color:
-                            AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Get personalized suggestions for your farm.',
-                      maxLines: 2,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.primary,
               ),
             ],
           ),

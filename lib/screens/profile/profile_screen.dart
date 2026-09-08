@@ -1,36 +1,68 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimensions.dart';
+import '../auth/login_screen.dart';
+import '../settings/settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
-  final String? name;
-  final String? email;
-  final String? phone;
-  final String? location;
-  final String? farmName;
-  final VoidCallback? onEditProfile;
-  final VoidCallback? onSettings;
-  final VoidCallback? onLogout;
-
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
-    this.name,
-    this.email,
-    this.phone,
-    this.location,
-    this.farmName,
-    this.onEditProfile,
-    this.onSettings,
-    this.onLogout,
   });
 
   @override
+  State<ProfileScreen> createState() =>
+      _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  User? get _user => FirebaseAuth.instance.currentUser;
+
+  String get _displayName {
+    final name = _user?.displayName?.trim();
+
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    return 'Farmer';
+  }
+
+  String get _email {
+    return _user?.email?.trim() ?? '';
+  }
+
+  String get _initials {
+    final name = _displayName.trim();
+
+    if (name.isEmpty) {
+      return 'F';
+    }
+
+    final parts = name
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.length == 1) {
+      final value = parts.first;
+
+      return value
+          .substring(
+            0,
+            value.length > 1 ? 2 : 1,
+          )
+          .toUpperCase();
+    }
+
+    return '${parts.first[0]}${parts.last[0]}'
+        .toUpperCase();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final displayName =
-        name?.trim().isNotEmpty == true
-            ? name!.trim()
-            : 'Farmer';
+    final user = _user;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -40,14 +72,13 @@ class ProfileScreen extends StatelessWidget {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         actions: [
-          if (onSettings != null)
-            IconButton(
-              onPressed: onSettings,
-              tooltip: 'Settings',
-              icon: const Icon(
-                Icons.settings_outlined,
-              ),
+          IconButton(
+            onPressed: _openSettings,
+            tooltip: 'Settings',
+            icon: const Icon(
+              Icons.settings_outlined,
             ),
+          ),
         ],
       ),
       body: SafeArea(
@@ -61,61 +92,175 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             children: [
               _ProfileHeader(
-                name: displayName,
-                email: email,
-                onEdit: onEditProfile,
+                name: _displayName,
+                email: _email,
+                initials: _initials,
+                isEmailVerified:
+                    user?.emailVerified ?? false,
+                onEdit: _openEditProfile,
               ),
+
               const SizedBox(height: 18),
+
               _ProfileInformationCard(
-                phone: phone,
-                location: location,
-                farmName: farmName,
+                email: _email,
+                isEmailVerified:
+                    user?.emailVerified ?? false,
               ),
+
               const SizedBox(height: 18),
+
+              _ProfileActionCard(
+                icon: Icons.person_outline_rounded,
+                title: 'Edit Profile',
+                subtitle:
+                    'Update your personal information',
+                onTap: _openEditProfile,
+              ),
+
+              const SizedBox(height: 12),
+
               _ProfileActionCard(
                 icon: Icons.settings_outlined,
                 title: 'Settings',
                 subtitle:
                     'Manage your app preferences',
-                onTap: onSettings,
+                onTap: _openSettings,
               ),
-              if (onLogout != null) ...[
-                const SizedBox(height: 12),
-                _ProfileActionCard(
-                  icon: Icons.logout_rounded,
-                  title: 'Log Out',
-                  subtitle:
-                      'Sign out of your account',
-                  color: const Color(0xFFD64545),
-                  backgroundColor:
-                      const Color(0xFFFFF1F1),
-                  onTap: onLogout,
-                ),
-              ],
+
+              const SizedBox(height: 12),
+
+              _ProfileActionCard(
+                icon: Icons.logout_rounded,
+                title: 'Log Out',
+                subtitle:
+                    'Sign out of your account',
+                color: const Color(0xFFD64545),
+                backgroundColor:
+                    const Color(0xFFFFF1F1),
+                onTap: _confirmLogout,
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  void _openEditProfile() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Edit Profile feature is coming next.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const SettingsScreen(),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout =
+        await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Log Out'),
+          content: const Text(
+            'Are you sure you want to log out of your account?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext)
+                    .pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext)
+                    .pop(true);
+              },
+              child: const Text('Log Out'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true) {
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => const LoginScreen(),
+        ),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ??
+                'Unable to log out. Please try again.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to log out. Please try again.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }
 
 class _ProfileHeader extends StatelessWidget {
   final String name;
-  final String? email;
-  final VoidCallback? onEdit;
+  final String email;
+  final String initials;
+  final bool isEmailVerified;
+  final VoidCallback onEdit;
 
   const _ProfileHeader({
     required this.name,
-    this.email,
-    this.onEdit,
+    required this.email,
+    required this.initials,
+    required this.isEmailVerified,
+    required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasEmail =
-        email?.trim().isNotEmpty == true;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -143,8 +288,8 @@ class _ProfileHeader extends StatelessWidget {
                     BoxShadow(
                       color:
                           AppColors.primary.withValues(
-                        alpha: 0.18,
-                      ),
+                    alpha: 0.18,
+                  ),
                       blurRadius: 18,
                       offset: const Offset(0, 7),
                     ),
@@ -152,7 +297,7 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    _initials(name),
+                    initials,
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
@@ -161,34 +306,35 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onEdit != null)
-                Material(
-                  color: Colors.white,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    onTap: onEdit,
-                    customBorder:
-                        const CircleBorder(),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.border,
-                        ),
+              Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: onEdit,
+                  customBorder:
+                      const CircleBorder(),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.border,
                       ),
-                      child: const Icon(
-                        Icons.edit_outlined,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
+                    ),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
+              ),
             ],
           ),
+
           const SizedBox(height: 14),
+
           Text(
             name,
             textAlign: TextAlign.center,
@@ -198,10 +344,11 @@ class _ProfileHeader extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          if (hasEmail) ...[
+
+          if (email.isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
-              email!,
+              email,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 12.5,
@@ -210,96 +357,68 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ),
           ],
+
+          const SizedBox(height: 9),
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: isEmailVerified
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFFFF4E5),
+              borderRadius:
+                  BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isEmailVerified
+                      ? Icons.verified_rounded
+                      : Icons
+                          .pending_outlined,
+                  size: 14,
+                  color: isEmailVerified
+                      ? AppColors.primary
+                      : const Color(0xFFB86B00),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  isEmailVerified
+                      ? 'Email verified'
+                      : 'Email not verified',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isEmailVerified
+                        ? AppColors.primary
+                        : const Color(0xFFB86B00),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-
-  String _initials(String value) {
-    final parts = value
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) {
-      return 'F';
-    }
-
-    if (parts.length == 1) {
-      return parts.first
-          .substring(
-            0,
-            parts.first.length > 1 ? 2 : 1,
-          )
-          .toUpperCase();
-    }
-
-    return '${parts.first[0]}${parts.last[0]}'
-        .toUpperCase();
-  }
 }
 
-class _ProfileInformationCard extends StatelessWidget {
-  final String? phone;
-  final String? location;
-  final String? farmName;
+class _ProfileInformationCard
+    extends StatelessWidget {
+  final String email;
+  final bool isEmailVerified;
 
   const _ProfileInformationCard({
-    this.phone,
-    this.location,
-    this.farmName,
+    required this.email,
+    required this.isEmailVerified,
   });
 
   @override
   Widget build(BuildContext context) {
-    final items = <_ProfileInfoItem>[
-      if (_hasValue(phone))
-        _ProfileInfoItem(
-          icon: Icons.phone_outlined,
-          title: 'Phone',
-          value: phone!,
-        ),
-      if (_hasValue(location))
-        _ProfileInfoItem(
-          icon: Icons.location_on_outlined,
-          title: 'Location',
-          value: location!,
-        ),
-      if (_hasValue(farmName))
-        _ProfileInfoItem(
-          icon: Icons.agriculture_outlined,
-          title: 'Farm',
-          value: farmName!,
-        ),
-    ];
-
-    if (items.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(
-            AppDimensions.radius18,
-          ),
-          border: Border.all(
-            color: AppColors.border,
-          ),
-        ),
-        child: const Text(
-          'Add your farm and personal information to complete your profile.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12.5,
-            height: 1.4,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      );
-    }
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(17),
@@ -314,36 +433,43 @@ class _ProfileInformationCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < items.length; i++) ...[
-            items[i],
-            if (i != items.length - 1)
-              const Padding(
-                padding: EdgeInsets.symmetric(
-                  vertical: 13,
-                ),
-                child: Divider(
-                  height: 1,
-                  color: AppColors.divider,
-                ),
-              ),
-          ],
+          _InfoItem(
+            icon: Icons.email_outlined,
+            title: 'Email',
+            value: email.isEmpty
+                ? 'Not available'
+                : email,
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(
+              vertical: 13,
+            ),
+            child: Divider(
+              height: 1,
+              color: AppColors.divider,
+            ),
+          ),
+
+          _InfoItem(
+            icon: Icons.verified_user_outlined,
+            title: 'Account Status',
+            value: isEmailVerified
+                ? 'Verified'
+                : 'Email verification pending',
+          ),
         ],
       ),
     );
   }
-
-  bool _hasValue(String? value) {
-    return value != null &&
-        value.trim().isNotEmpty;
-  }
 }
 
-class _ProfileInfoItem extends StatelessWidget {
+class _InfoItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
 
-  const _ProfileInfoItem({
+  const _InfoItem({
     required this.icon,
     required this.title,
     required this.value,
@@ -400,13 +526,14 @@ class _ProfileInfoItem extends StatelessWidget {
   }
 }
 
-class _ProfileActionCard extends StatelessWidget {
+class _ProfileActionCard
+    extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final Color backgroundColor;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const _ProfileActionCard({
     required this.icon,
@@ -414,7 +541,7 @@ class _ProfileActionCard extends StatelessWidget {
     required this.subtitle,
     this.color = AppColors.primary,
     this.backgroundColor = AppColors.surface,
-    this.onTap,
+    required this.onTap,
   });
 
   @override
@@ -456,7 +583,9 @@ class _ProfileActionCard extends StatelessWidget {
                   color: color,
                 ),
               ),
+
               const SizedBox(width: 12),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -488,6 +617,7 @@ class _ProfileActionCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const Icon(
                 Icons.chevron_right_rounded,
                 size: 22,

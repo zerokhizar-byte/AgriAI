@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../screens/home/home_screen.dart';
 import '../screens/language/language_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -13,6 +12,7 @@ import '../screens/weather/weather_screen.dart';
 import '../screens/yield_prediction/yield_prediction_screen.dart';
 import '../screens/disease_detection/disease_detection_screen.dart';
 import '../screens/recommendations/recommendations_screen.dart';
+import 'main_navigation.dart';
 
 class AppRouter {
   AppRouter._();
@@ -28,8 +28,7 @@ class AppRouter {
   static const String recommendations = '/recommendations';
   static const String profile = '/profile';
   static const String settings = '/settings';
-  static const String languageSettings =
-      '/settings/language';
+  static const String languageSettings = '/settings/language';
   static const String about = '/settings/about';
 
   static Route<dynamic> generateRoute(
@@ -54,9 +53,13 @@ class AppRouter {
           settings,
         );
 
+      // IMPORTANT:
+      // Home is the root of the authenticated app.
+      // It must use MainNavigation so the bottom navigation
+      // controls Home, Weather, Insights and Profile.
       case home:
         return _fadeRoute(
-          const HomeScreen(),
+          const MainNavigation(),
           settings,
         );
 
@@ -90,6 +93,7 @@ class AppRouter {
           settings,
         );
 
+      // Direct profile route is retained for compatibility.
       case profile:
         return _fadeRoute(
           const ProfileScreen(),
@@ -128,10 +132,12 @@ class AppRouter {
   ) {
     return PageRouteBuilder<dynamic>(
       settings: settings,
-      transitionDuration:
-          const Duration(milliseconds: 280),
-      reverseTransitionDuration:
-          const Duration(milliseconds: 220),
+      transitionDuration: const Duration(
+        milliseconds: 280,
+      ),
+      reverseTransitionDuration: const Duration(
+        milliseconds: 220,
+      ),
       pageBuilder: (
         context,
         animation,

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -60,27 +61,98 @@ class _ForgotPasswordScreenState
       _isLoading = true;
     });
 
-    await Future<void>.delayed(
-      const Duration(milliseconds: 900),
-    );
+    final String email =
+        _emailController.text.trim();
 
-    if (!mounted) {
-      return;
-    }
+    try {
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(
+        email: email,
+      );
 
-    setState(() {
-      _isLoading = false;
-      _emailSent = true;
-    });
+      if (!mounted) {
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Password reset link sent successfully',
+      setState(() {
+        _isLoading = false;
+        _emailSent = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password reset link sent successfully',
+          ),
+          behavior: SnackBarBehavior.floating,
         ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      String message;
+
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'Enter a valid email address.';
+          break;
+
+        case 'user-not-found':
+          message =
+              'No account was found with this email address.';
+          break;
+
+        case 'network-request-failed':
+          message =
+              'Check your internet connection and try again.';
+          break;
+
+        case 'too-many-requests':
+          message =
+              'Too many attempts. Please try again later.';
+          break;
+
+        case 'operation-not-allowed':
+          message =
+              'Email/password authentication is not enabled.';
+          break;
+
+        default:
+          message =
+              e.message ??
+              'Unable to send the reset link. Please try again.';
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Something went wrong. Please try again.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _backToLogin() {

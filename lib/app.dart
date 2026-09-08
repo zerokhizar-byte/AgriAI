@@ -4,7 +4,7 @@ import 'core/theme/app_colors.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/language/language_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
-import 'screens/home/home_screen.dart';
+import 'navigation/main_navigation.dart';
 import 'screens/yield_prediction/yield_prediction_screen.dart';
 import 'screens/disease_detection/disease_detection_screen.dart';
 import 'screens/soil_analysis/soil_analysis_screen.dart';
@@ -52,8 +52,11 @@ class AgriAIApp extends StatelessWidget {
         '/onboarding': (context) =>
             const OnboardingScreen(),
 
+        // IMPORTANT:
+        // Always open MainNavigation instead
+        // of opening HomeScreen directly.
         '/home': (context) =>
-            const HomeScreen(),
+            const MainNavigation(),
 
         '/yield-prediction': (context) =>
             const YieldPredictionScreen(),

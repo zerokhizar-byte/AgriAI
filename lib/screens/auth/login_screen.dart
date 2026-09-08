@@ -4,9 +4,11 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 import '../../core/services/auth_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../navigation/main_navigation.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/common/app_text_field.dart';
-import '../home/home_screen.dart';
+import 'forgot_password_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
@@ -110,9 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
       });
 
-      _showAuthError(
-        _firebaseErrorMessage(e),
-      );
+      _showAuthError(_firebaseErrorMessage(e));
     } catch (_) {
       if (!mounted) {
         return;
@@ -156,9 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isGoogleLoading = false;
       });
 
-      _showAuthError(
-        _firebaseErrorMessage(e),
-      );
+      _showAuthError(_firebaseErrorMessage(e));
     } catch (e) {
       if (!mounted) {
         return;
@@ -202,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _isFacebookLoading = false;
           });
         }
+
         return;
       }
 
@@ -217,6 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
           result.message ??
               'Facebook sign-in could not be completed.',
         );
+
         return;
       }
 
@@ -247,9 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isFacebookLoading = false;
       });
 
-      _showAuthError(
-        _firebaseErrorMessage(e),
-      );
+      _showAuthError(_firebaseErrorMessage(e));
     } catch (e) {
       if (!mounted) {
         return;
@@ -272,16 +270,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLoginSuccess() {
-    widget.onLoginSuccess?.call();
-
-    if (widget.onLoginSuccess == null && mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => const HomeScreen(),
-        ),
-        (route) => false,
-      );
+    if (widget.onLoginSuccess != null) {
+      widget.onLoginSuccess!.call();
+      return;
     }
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => const MainNavigation(
+          initialIndex: 0,
+        ),
+      ),
+      (route) => false,
+    );
   }
 
   String _firebaseErrorMessage(
@@ -333,7 +338,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _openRegister() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const _RegisterPlaceholder(),
+        builder: (_) => const RegisterScreen(),
       ),
     );
   }
@@ -341,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _openForgotPassword() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const _ForgotPasswordPlaceholder(),
+        builder: (_) => const ForgotPasswordScreen(),
       ),
     );
   }
@@ -409,7 +414,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextInputType.emailAddress,
                   textInputAction:
                       TextInputAction.next,
-                  prefixIcon: Icons.email_outlined,
+                  prefixIcon:
+                      Icons.email_outlined,
                   validator: _validateEmail,
                 ),
 
@@ -419,14 +425,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _passwordController,
                   label: 'Password',
                   hint: 'Enter your password',
-                  obscureText: _obscurePassword,
+                  obscureText:
+                      _obscurePassword,
                   textInputAction:
                       TextInputAction.done,
                   prefixIcon:
                       Icons.lock_outline_rounded,
-                  suffixIcon: _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
+                  suffixIcon:
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                   onSuffixIconPressed: () {
                     setState(() {
                       _obscurePassword =
@@ -494,7 +502,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Forgot password?',
                         style: TextStyle(
                           fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
+                          fontWeight:
+                              FontWeight.w700,
                         ),
                       ),
                     ),
@@ -513,7 +522,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ElevatedButton.styleFrom(
                       backgroundColor:
                           AppColors.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor:
+                          Colors.white,
                       disabledBackgroundColor:
                           AppColors.primary.withValues(
                         alpha: 0.55,
@@ -527,9 +537,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: AnimatedSwitcher(
                       duration:
-                          const Duration(
-                        milliseconds: 180,
-                      ),
+                          const Duration(milliseconds: 180),
                       child: _isLoading
                           ? const SizedBox(
                               key: ValueKey(
@@ -587,7 +595,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         'OR',
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                          fontWeight:
+                              FontWeight.w700,
                           color:
                               AppColors.textMuted,
                         ),
@@ -603,7 +612,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // GOOGLE LOGIN
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -615,7 +623,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         OutlinedButton.styleFrom(
                       foregroundColor:
                           AppColors.textPrimary,
-                      backgroundColor: Colors.white,
+                      backgroundColor:
+                          Colors.white,
                       side: const BorderSide(
                         color: AppColors.border,
                         width: 1,
@@ -629,9 +638,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: AnimatedSwitcher(
                       duration:
-                          const Duration(
-                        milliseconds: 180,
-                      ),
+                          const Duration(milliseconds: 180),
                       child: _isGoogleLoading
                           ? const SizedBox(
                               key: ValueKey(
@@ -663,8 +670,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         fontSize: 18,
                                         fontWeight:
                                             FontWeight.w900,
-                                        color:
-                                            Color(
+                                        color: Color(
                                           0xFF4285F4,
                                         ),
                                       ),
@@ -688,7 +694,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 12),
 
-                // FACEBOOK LOGIN
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -700,7 +705,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         OutlinedButton.styleFrom(
                       foregroundColor:
                           AppColors.textPrimary,
-                      backgroundColor: Colors.white,
+                      backgroundColor:
+                          Colors.white,
                       side: const BorderSide(
                         color: AppColors.border,
                         width: 1,
@@ -714,9 +720,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: AnimatedSwitcher(
                       duration:
-                          const Duration(
-                        milliseconds: 180,
-                      ),
+                          const Duration(milliseconds: 180),
                       child: _isFacebookLoading
                           ? const SizedBox(
                               key: ValueKey(
@@ -748,8 +752,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         fontSize: 23,
                                         fontWeight:
                                             FontWeight.w900,
-                                        color:
-                                            Color(
+                                        color: Color(
                                           0xFF1877F2,
                                         ),
                                       ),
@@ -779,7 +782,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                    color:
+                        AppColors.textSecondary,
                   ),
                 ),
 
@@ -803,44 +807,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RegisterPlaceholder
-    extends StatelessWidget {
-  const _RegisterPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-      ),
-      body: const Center(
-        child: Text(
-          'Register screen will be connected next.',
-        ),
-      ),
-    );
-  }
-}
-
-class _ForgotPasswordPlaceholder
-    extends StatelessWidget {
-  const _ForgotPasswordPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Forgot Password'),
-      ),
-      body: const Center(
-        child: Text(
-          'Forgot password screen will be connected next.',
         ),
       ),
     );
