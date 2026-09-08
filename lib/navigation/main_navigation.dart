@@ -7,12 +7,16 @@ import '../screens/settings/settings_screen.dart';
 import '../screens/yield_prediction/yield_prediction_screen.dart';
 import 'bottom_nav_bar.dart';
 
+typedef ThemeModeChanged = Future<void> Function(ThemeMode mode);
+
 class MainNavigation extends StatefulWidget {
   final int initialIndex;
+  final ThemeModeChanged? onThemeModeChanged;
 
   const MainNavigation({
     super.key,
     this.initialIndex = 0,
+    this.onThemeModeChanged,
   });
 
   @override
@@ -20,39 +24,17 @@ class MainNavigation extends StatefulWidget {
       _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation>
-    with AutomaticKeepAliveClientMixin<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> {
   late int _currentIndex;
-
-  late final List<Widget> _screens;
-
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-
     _currentIndex = widget.initialIndex.clamp(0, 3);
-
-    _screens = [
-      HomeScreen(
-        onYieldPrediction: _openYieldPrediction,
-        onDiseaseDetection: _openDiseasePrediction,
-        onSoilAnalysis: _openSoilAnalysis,
-        onWeather: _openWeather,
-        onRecommendations: _openRecommendations,
-        onProfile: _openSettings,
-        onCropHistory: _openCropHistory,
-      ),
-      const YieldPredictionScreen(),
-      const DiseaseDetectionScreen(),
-      const SettingsScreen(),
-    ];
   }
 
   void _onNavigationChanged(int index) {
-    if (index < 0 || index >= _screens.length) {
+    if (index < 0 || index > 3) {
       return;
     }
 
@@ -65,59 +47,40 @@ class _MainNavigationState extends State<MainNavigation>
     });
   }
 
-  // ignore: unused_element
-  void _openHome() {
-    _onNavigationChanged(0);
-  }
+  Widget _buildCurrentScreen() {
+    switch (_currentIndex) {
+      case 0:
+        return HomeScreen(
+          onProfile: () {
+            _onNavigationChanged(3);
+          },
+        );
 
-  void _openYieldPrediction() {
-    _onNavigationChanged(1);
-  }
+      case 1:
+        return const YieldPredictionScreen();
 
-  void _openDiseasePrediction() {
-    _onNavigationChanged(2);
-  }
+      case 2:
+        return const DiseaseDetectionScreen();
 
-  void _openSettings() {
-    _onNavigationChanged(3);
-  }
+      case 3:
+        return SettingsScreen(
+          onThemeModeChanged: widget.onThemeModeChanged,
+        );
 
-  void _openSoilAnalysis() {
-    Navigator.of(context).pushNamed('/soil-analysis');
-  }
-
-  void _openWeather() {
-    Navigator.of(context).pushNamed('/weather');
-  }
-
-  void _openRecommendations() {
-    Navigator.of(context).pushNamed('/recommendations');
-  }
-
-  void _openCropHistory() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Crop History will be available soon.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      default:
+        return HomeScreen(
+          onProfile: () {
+            _onNavigationChanged(3);
+          },
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      extendBody: false,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: _buildCurrentScreen(),
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: _currentIndex,
         onItemSelected: _onNavigationChanged,
