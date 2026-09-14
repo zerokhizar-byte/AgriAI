@@ -8,14 +8,12 @@ import '../../language_selection_screen.dart';
 import '../../navigation/main_navigation.dart';
 import '../auth/login_screen.dart';
 
-typedef ThemeModeChanged = Future<void> Function(ThemeMode mode);
-
 class SplashScreen extends StatefulWidget {
-  final ThemeModeChanged? onThemeModeChanged;
+  final VoidCallback? onAppReady;
 
   const SplashScreen({
     super.key,
-    this.onThemeModeChanged,
+    this.onAppReady,
   });
 
   @override
@@ -26,11 +24,11 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _startApp();
+    unawaited(_startApp());
   }
 
   Future<void> _startApp() async {
-    await Future.delayed(
+    await Future<void>.delayed(
       const Duration(seconds: 2),
     );
 
@@ -53,15 +51,17 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (!languageSelected) {
-      Navigator.of(context).pushReplacement(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => const LanguageSelectionScreen(),
+          builder: (_) =>
+              const LanguageSelectionScreen(),
         ),
       );
       return;
     }
 
-    User? user = FirebaseAuth.instance.currentUser;
+    User? user =
+        FirebaseAuth.instance.currentUser;
 
     user ??= await _getAuthUser();
 
@@ -70,17 +70,17 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     if (user != null) {
-      Navigator.of(context).pushReplacement(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => MainNavigation(
-            onThemeModeChanged: widget.onThemeModeChanged,
+            onAppReady: widget.onAppReady,
           ),
         ),
       );
       return;
     }
 
-    Navigator.of(context).pushReplacement(
+    await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => const LoginScreen(),
       ),
@@ -94,7 +94,8 @@ class _SplashScreenState extends State<SplashScreen> {
           .first
           .timeout(
         const Duration(seconds: 5),
-        onTimeout: () => FirebaseAuth.instance.currentUser,
+        onTimeout: () =>
+            FirebaseAuth.instance.currentUser,
       );
     } catch (_) {
       return FirebaseAuth.instance.currentUser;
@@ -103,13 +104,18 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme =
+        Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: <Widget>[
               Image.asset(
                 'assets/images/agriai_logo.png',
                 width: 150,
@@ -121,9 +127,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   StackTrace? stackTrace,
                 ) {
                   return Icon(
-                    Icons.agriculture,
+                    Icons.agriculture_rounded,
                     size: 100,
-                    color: Theme.of(context).colorScheme.primary,
+                    color:
+                        theme.colorScheme.primary,
                   );
                 },
               ),
@@ -132,8 +139,10 @@ class _SplashScreenState extends State<SplashScreen> {
                 'AgriAI',
                 style: TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight:
+                      FontWeight.bold,
+                  color:
+                      theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -141,7 +150,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Smart Agriculture',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Theme.of(context)
+                  color: theme
                       .colorScheme
                       .onSurfaceVariant,
                 ),
@@ -150,9 +159,12 @@ class _SplashScreenState extends State<SplashScreen> {
               SizedBox(
                 width: 30,
                 height: 30,
-                child: CircularProgressIndicator(
+                child:
+                    CircularProgressIndicator(
                   strokeWidth: 3,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: theme
+                      .colorScheme
+                      .primary,
                 ),
               ),
             ],
