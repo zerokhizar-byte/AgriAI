@@ -14,6 +14,7 @@ class DirectConversation {
   final String lastMessageType;
   final DateTime? lastMessageAt;
   final DateTime? updatedAt;
+  final Map<String, int> unreadCounts;
 
   const DirectConversation({
     required this.id,
@@ -22,6 +23,7 @@ class DirectConversation {
     required this.lastMessageType,
     required this.lastMessageAt,
     required this.updatedAt,
+    required this.unreadCounts,
   });
 
   String otherParticipantUid(String currentUid) {
@@ -34,11 +36,25 @@ class DirectConversation {
     return '';
   }
 
+  int unreadCountFor(String uid) => unreadCounts[uid] ?? 0;
+
   factory DirectConversation.fromDocument(
     DocumentSnapshot<Map<String, dynamic>> document,
   ) {
     final Map<String, dynamic> data =
         document.data() ?? <String, dynamic>{};
+
+    final Map<String, int> parsedUnreadCounts = <String, int>{};
+    final dynamic rawUnreadCounts = data['unreadCounts'];
+
+    if (rawUnreadCounts is Map) {
+      rawUnreadCounts.forEach((dynamic key, dynamic value) {
+        final int? parsedValue = value is num ? value.toInt() : int.tryParse('$value');
+        if (parsedValue != null && parsedValue > 0) {
+          parsedUnreadCounts['$key'] = parsedValue;
+        }
+      });
+    }
 
     return DirectConversation(
       id: document.id,
@@ -56,6 +72,7 @@ class DirectConversation {
       updatedAt: _timestampToDateTime(
         data['updatedAt'],
       ),
+      unreadCounts: parsedUnreadCounts,
     );
   }
 }
@@ -191,7 +208,21 @@ class DirectMessagesService {
           'lastMessageType': 'text',
           'lastMessageAt': null,
           'updatedAt': FieldValue.serverTimestamp(),
+          'unreadCounts': <String, int>{
+            currentUid: 0,
+            normalizedOtherUid: 0,
+          },
         },
+      );
+    } else if (snapshot.data()?['unreadCounts'] == null) {
+      await reference.set(
+        <String, dynamic>{
+          'unreadCounts': <String, int>{
+            currentUid: 0,
+            normalizedOtherUid: 0,
+          },
+        },
+        SetOptions(merge: true),
       );
     }
 
@@ -454,6 +485,10 @@ class DirectMessagesService {
         'lastMessageType': typeValue,
         'lastMessageAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'unreadCounts': <String, dynamic>{
+          currentUser.uid: FieldValue.increment(0),
+          normalizedReceiverUid: FieldValue.increment(1),
+        },
       },
       SetOptions(merge: true),
     );
@@ -472,18 +507,16 @@ class DirectMessagesService {
       return;
     }
 
+    final DocumentReference<Map<String, dynamic>> conversation =
+        _conversations.doc(conversationId.trim());
+
     final QuerySnapshot<Map<String, dynamic>> snapshot =
-        await _conversations
-            .doc(conversationId.trim())
+        await conversation
             .collection('messages')
             .where('receiverUid', isEqualTo: currentUser.uid)
             .where('seen', isEqualTo: false)
             .limit(100)
             .get();
-
-    if (snapshot.docs.isEmpty) {
-      return;
-    }
 
     final WriteBatch batch = _firestore.batch();
 
@@ -496,6 +529,16 @@ class DirectMessagesService {
         },
       );
     }
+
+    batch.set(
+      conversation,
+      <String, dynamic>{
+        'unreadCounts': <String, dynamic>{
+          currentUser.uid: 0,
+        },
+      },
+      SetOptions(merge: true),
+    );
 
     await batch.commit();
   }
@@ -519,21 +562,15 @@ class DirectMessagesService {
 
     for (final QueryDocumentSnapshot<Map<String, dynamic>> conversation
         in conversations.docs) {
-      final QuerySnapshot<Map<String, dynamic>> messages =
-          await conversation.reference
-              .collection('messages')
-              .where(
-                'receiverUid',
-                isEqualTo: currentUser.uid,
-              )
-              .where(
-                'seen',
-                isEqualTo: false,
-              )
-              .limit(100)
-              .get();
+      final dynamic rawUnreadCounts =
+          conversation.data()['unreadCounts'];
 
-      unread += messages.docs.length;
+      if (rawUnreadCounts is Map) {
+        final dynamic value = rawUnreadCounts[currentUser.uid];
+        if (value is num) {
+          unread += value.toInt();
+        }
+      }
     }
 
     return unread;
