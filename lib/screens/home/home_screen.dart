@@ -20,6 +20,7 @@ import '../../services/community_posts_service.dart';
 import '../../services/community_comments_service.dart';
 import '../../services/community_saved_posts_service.dart';
 import '../../services/community_share_service.dart';
+import '../../services/direct_messages_service.dart';
 import '../direct_messages/direct_messages_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -4338,6 +4339,24 @@ class _AgriAIShareSheetState extends State<_AgriAIShareSheet> {
     setState(() => _loading = true);
 
     try {
+      // Create/open the DM conversation first. A share inside AgriAI
+      // must also appear as a real message in the farmer's inbox.
+      final String conversationId =
+          await DirectMessagesService.getOrCreateConversation(
+        otherUid: user.uid,
+      );
+
+      // Send the actual post into the DM conversation so the recipient
+      // gets a conversation, unread count, and a mixed-media message.
+      await DirectMessagesService.sendPostMessage(
+        conversationId: conversationId,
+        receiverUid: user.uid,
+        postId: widget.post.id,
+        text: widget.post.text.trim(),
+        mediaUrl: widget.post.mediaUrl?.trim() ?? '',
+      );
+
+      // Keep the existing share-history record as well.
       await CommunityShareService.sharePostToUser(
         postId: widget.post.id,
         toUid: user.uid,
