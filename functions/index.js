@@ -30,7 +30,7 @@ exports.sendNotification = onDocumentCreated(
     const userData = userSnapshot.data() || {};
     const fcmToken = userData.fcmToken;
 
-    if (typeof fcmToken !== "string" || fcmToken.trim().isEmpty) {
+    if (typeof fcmToken !== "string" || !fcmToken.trim()) {
       console.log(`No valid FCM token found for user: ${userId}`);
       return;
     }
