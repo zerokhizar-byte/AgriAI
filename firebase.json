@@ -1,1 +1,24 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"agriai-8704e","appId":"1:1017607357742:android:9dc56e138803fdc9ece6bf","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"agriai-8704e","configurations":{"android":"1:1017607357742:android:9dc56e138803fdc9ece6bf"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "agriai-8704e",
+          "appId": "1:1017607357742:android:9dc56e138803fdc9ece6bf",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "agriai-8704e",
+          "configurations": {
+            "android": "1:1017607357742:android:9dc56e138803fdc9ece6bf"
+          }
+        }
+      }
+    }
+  },
+  "functions": {
+    "source": "functions"
+  }
+}
