@@ -2,7 +2,7 @@ name: agriai
 description: "AgriAI - Smart Agriculture Application"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.13.0
@@ -42,7 +42,8 @@ dependencies:
 
   # Facebook authentication
   flutter_facebook_auth: ^7.2.0
-
+  
+  flutter_local_notifications: ^22.3.1
   # GPS / device location
   geolocator: ^14.0.2
   
@@ -51,6 +52,9 @@ dependencies:
   firebase_analytics: ^12.5.0
   package_info_plus: ^10.2.1
   share_plus: ^13.3.0
+  firebase_messaging: ^16.7.0
+  flutter_onnxruntime: ^1.8.3
+  image: ^4.10.1
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +68,9 @@ flutter:
 
   assets:
     - assets/images/agriai_logo.png
+    - assets/animations/agriai_logo.mp4
+    - assets/models/disease_model.onnx
+    - assets/models/class_names.json
 
 flutter_launcher_icons:
   android: true

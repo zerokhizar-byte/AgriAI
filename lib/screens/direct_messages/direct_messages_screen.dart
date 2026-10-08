@@ -448,7 +448,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
-        0,
+        _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
@@ -548,7 +548,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
 
                 return ListView.builder(
                   controller: _scrollController,
-                  reverse: true,
+                  reverse: false,
                   padding: const EdgeInsets.fromLTRB(12, 16, 12, 18),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {

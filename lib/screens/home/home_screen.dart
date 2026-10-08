@@ -15,12 +15,14 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/app_notification_model.dart';
 import '../../services/cloudinary_media_service.dart';
 import '../../services/community_posts_service.dart';
 import '../../services/community_comments_service.dart';
 import '../../services/community_saved_posts_service.dart';
 import '../../services/community_share_service.dart';
 import '../../services/direct_messages_service.dart';
+import '../../services/notification_service.dart';
 import '../direct_messages/direct_messages_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -59,6 +61,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
   DateTime _now = DateTime.now();
 
+  // ---------------------------------------------------------------------------
+  // NOTIFICATIONS
+  // ---------------------------------------------------------------------------
+
+  void _handleNotificationTap() {
+    final Map<String, dynamic>? data =
+        NotificationService.notificationTap.value;
+
+    if (data == null) {
+      return;
+    }
+
+    // Consume the event so the same notification is not handled twice.
+    NotificationService.notificationTap.value = null;
+
+    final String type =
+        data['type']?.toString().trim() ?? '';
+
+    if (type != 'dailyNews') {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      unawaited(_openNewsPanel());
+    });
+  }
+
+  
   // ---------------------------------------------------------------------------
   // WEATHER
   // ---------------------------------------------------------------------------
@@ -119,7 +157,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _assistantOpen = false;
   bool _listening = false;
-  bool _speechAvailable = false;
   bool _assistantBusy = false;
   bool _ttsReady = false;
 
@@ -128,6 +165,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    NotificationService.notificationTap.addListener(
+      _handleNotificationTap,
+    );
 
     _clockTimer = Timer.periodic(
       const Duration(seconds: 1),
@@ -142,7 +183,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
 
-    unawaited(_initializeSpeech());
     unawaited(_initializeTts());
     unawaited(_loadLocationAndWeather());
     unawaited(_loadNews());
@@ -152,6 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    NotificationService.notificationTap.removeListener(
+      _handleNotificationTap,
+    );
+
     _clockTimer?.cancel();
 
     _postController.dispose();
@@ -182,6 +226,17 @@ class _HomeScreenState extends State<HomeScreen> {
           duration: const Duration(seconds: 3),
         ),
       );
+  }
+
+  void _showNotificationsSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return const _NotificationsSheet();
+      },
+    );
   }
 
 
@@ -239,7 +294,11 @@ class _HomeScreenState extends State<HomeScreen> {
       await _tts.setSpeechRate(0.48);
       await _tts.setPitch(1.0);
       await _tts.setVolume(1.0);
-      await _tts.setLanguage(_speechLocaleId);
+      try {
+        await _tts.setLanguage(_speechLocaleId);
+      } catch (_) {
+        await _tts.setLanguage('en-US');
+      }
 
       if (!mounted) {
         return;
@@ -259,109 +318,167 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _initializeSpeech() async {
-    try {
-      final bool available =
-          await _speech.initialize(
-        onStatus: (String status) {
-          if (!mounted) {
-            return;
-          }
+  Future<bool> _initializeSpeech() async {
+  try {
+    final bool available = await _speech.initialize(
+      onStatus: (String status) {
+        if (!mounted) {
+          return;
+        }
 
-          if (status == 'done' ||
-              status == 'notListening') {
-            setState(() {
-              _listening = false;
-            });
-          }
-        },
-        onError: (_) {
-          if (!mounted) {
-            return;
-          }
-
+        if (status == 'done' || status == 'notListening') {
           setState(() {
             _listening = false;
           });
-        },
-      );
+        }
+      },
+      onError: (dynamic error) {
+        if (!mounted) {
+          return;
+        }
 
-      if (!mounted) {
-        return;
-      }
+        final String errorMessage = '$error';
 
-      setState(() {
-        _speechAvailable = available;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
+        // error_no_match means the speech service did not recognize
+        // any words. It is not a microphone-permission failure.
+        if (errorMessage.toLowerCase().contains('error_no_match') ||
+            errorMessage.toLowerCase().contains('no_match') ||
+            errorMessage.toLowerCase().contains('no match')) {
+          setState(() {
+            _listening = false;
+          });
 
-      setState(() {
-        _speechAvailable = false;
-      });
-    }
-  }
+          _showMessage(
+            'I could not catch that. Please speak clearly and try again.',
+          );
+          return;
+        }
 
-  Future<void> _toggleListening() async {
-    if (!_speechAvailable) {
-      _showMessage(
-        'Voice input is not available on this device.',
-      );
-      return;
-    }
+        setState(() {
+          _listening = false;
+        });
 
-    if (_listening) {
-      await _speech.stop();
+        _showMessage(
+          'Speech recognition error: $errorMessage',
+        );
+      },
+      debugLogging: false,
+    );
 
-      if (!mounted) {
-        return;
-      }
-
+    return available;
+  } catch (_) {
+    if (mounted) {
       setState(() {
         _listening = false;
       });
+    }
 
+    return false;
+  }
+}
+
+Future<void> _toggleListening() async {
+  // Stop current speech recognition.
+  if (_listening) {
+    try {
+      await _speech.stop();
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _listening = false;
+      });
+    }
+
+    return;
+  }
+
+  // Initialize speech recognition only when the user taps
+  // the microphone button.
+  final bool available = await _initializeSpeech();
+
+  if (!available) {
+    if (!mounted) {
       return;
     }
 
-    setState(() {
-      _listening = true;
-    });
+    _showMessage(
+      'Speech recognition is unavailable on this device. '
+      'Please enable Google Speech Recognition and try again.',
+    );
+    return;
+  }
 
+  try {
     await _speech.listen(
       listenOptions: stt.SpeechListenOptions(
         localeId: _speechLocaleId,
+        partialResults: true,
+        cancelOnError: false,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 6),
+        listenMode: stt.ListenMode.dictation,
       ),
       onResult: (SpeechRecognitionResult result) {
         if (!mounted) {
           return;
         }
 
-        setState(() {
-          _chatController.text =
-              result.recognizedWords;
+        final String words =
+            result.recognizedWords.trim();
 
-          _chatController.selection =
-              TextSelection.fromPosition(
-            TextPosition(
-              offset:
-                  _chatController.text.length,
-            ),
-          );
-        });
+        if (words.isNotEmpty) {
+          setState(() {
+            _chatController.text = words;
+            _chatController.selection =
+                TextSelection.fromPosition(
+              TextPosition(
+                offset: _chatController.text.length,
+              ),
+            );
+          });
+        }
 
         if (result.finalResult) {
           setState(() {
             _listening = false;
           });
+
+          final String question =
+              _chatController.text.trim();
+
+          if (question.isNotEmpty && !_assistantBusy) {
+            unawaited(_sendMessage());
+          }
         }
       },
     );
-  }
 
-  Future<void> _speak(String text) async {
+    if (!mounted) {
+      return;
+    }
+
+    // speech_to_text 7.x listen() does not return a bool.
+    // It completes after starting the recognition request.
+    setState(() {
+      _listening = true;
+    });
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _listening = false;
+    });
+
+    _showMessage(
+      'Voice input could not start: $error',
+    );
+  }
+}
+
+Future<void> _speak(String text) async {
     if (!_ttsReady) {
       return;
     }
@@ -2425,321 +2542,175 @@ class _HomeScreenState extends State<HomeScreen> {
   // ===========================================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          AppColors.background,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color:
-              AppColors.primary,
+          color: AppColors.primary,
+          backgroundColor: AppColors.surface,
           onRefresh: () async {
-            await Future.wait<void>(
-              <Future<void>>[
-                _loadLocationAndWeather(),
-                _loadNews(),
-                _loadCommunityPosts(),
-              ],
-            );
+            await Future.wait<void>(<Future<void>>[
+              _loadLocationAndWeather(),
+              _loadNews(),
+              _loadCommunityPosts(),
+            ]);
           },
-          child:
-              CustomScrollView(
-            physics:
-                const AlwaysScrollableScrollPhysics(),
-            slivers:
-                <Widget>[
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: <Widget>[
               SliverPadding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  18,
-                  10,
-                  18,
-                  120,
-                ),
-                sliver:
-                    SliverList(
-                  delegate:
-                      SliverChildListDelegate(
-                    <Widget>[
-                      _Header(
-                        greeting:
-                            _greeting,
-                        name: _name,
-                        onSearch:
-                            widget.onSearch,
-                        onNotifications:
-                            () {
-                          _showMessage(
-                            'Notifications will appear here.',
-                          );
-                        },
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      _CompactWeather(
-                        weather:
-                            _weather,
-                        loading:
-                            _weatherLoading,
-                        location:
-                            _locationName,
-                        description:
-                            _weather == null
-                                ? 'Loading live weather…'
-                                : _weatherText(
-                                    _weather!.code,
-                                  ),
-                        icon:
-                            _weatherIcon(
-                          _weather?.code ??
-                              0,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate(<Widget>[
+                    _Header(
+                      greeting: _greeting,
+                      name: _name,
+                      onSearch: widget.onSearch,
+                      onNotifications: () {
+                        _showNotificationsSheet();
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    _CompactWeather(
+                      weather: _weather,
+                      loading: _weatherLoading,
+                      location: _locationName,
+                      description: _weather == null
+                          ? 'Live farm weather'
+                          : _weatherText(_weather!.code),
+                      icon: _weatherIcon(_weather?.code ?? 0),
+                      onRefresh: _loadLocationAndWeather,
+                    ),
+                    const SizedBox(height: 22),
+                    const SizedBox(height: 24),
+                    const _HomeSectionTitle(
+                      title: 'Farmer Community',
+                      subtitle: 'Share knowledge, questions and farm updates',
+                    ),
+                    const SizedBox(height: 10),
+                    _ComposerCard(
+                      name: _name,
+                      onCreatePost: _createPost,
+                      onPhoto: _quickPhotoPost,
+                      onReel: _createVideoDirectly,
+                      onIdea: () => _quickPresetPost('Idea'),
+                      onQuestion: () => _quickPresetPost('Question'),
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: <Widget>[
+                        const Expanded(
+                          child: Text(
+                            'Latest from farmers',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                         ),
-                        onRefresh:
-                            _loadLocationAndWeather,
-                      ),
-
-                      const SizedBox(
-                        height: 20,
-                      ),
-
+                        TextButton(
+                          onPressed: _createPost,
+                          child: const Text('Create Post'),
+                        ),
+                      ],
+                    ),
+                    if (_photoPostUploading)
                       const Padding(
-                        padding: EdgeInsets.only(left: 2, bottom: 10),
-                        child: Text(
-                          'SHARE WITH YOUR FARMING COMMUNITY',
-                          style: TextStyle(
-                            fontSize: 10,
-                            letterSpacing: 1.1,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.primary,
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: LinearProgressIndicator(
+                          minHeight: 3,
+                          color: AppColors.primary,
+                          backgroundColor: AppColors.cardGreen,
+                        ),
+                      ),
+                    if (_postsLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 30),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        ),
+                      )
+                    else if (_posts.isEmpty)
+                      const _EmptyPosts()
+                    else
+                      ..._posts.take(6).map(
+                        (CommunityPost post) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _PostCard(
+                            post: post,
+                            onMenu: () => _showPostMenu(post),
+                            onComments: () => _showComments(post),
+                            onShare: () => _sharePost(post),
                           ),
                         ),
                       ),
-
-                      _ComposerCard(
-                        name: _name,
-                        onCreatePost:
-                            _createPost,
-                        onPhoto: () =>
-                            _quickPhotoPost(),
-                        onReel:
-                            _createVideoDirectly,
-                        onIdea: () =>
-                            _quickPresetPost(
-                          'Idea',
-                        ),
-                        onQuestion: () =>
-                            _quickPresetPost(
-                          'Question',
-                        ),
-                      ),
-
-                      const SizedBox(
-                        height: 24,
-                      ),
-
-                      Row(
-                        children:
-                            <Widget>[
-                          const Expanded(
-                            child:
-                                _Title(
-                              'Agri Community',
-                            ),
+                    const SizedBox(height: 14),
+                    _HomeSectionTitle(
+                      title: 'Agriculture News',
+                      subtitle: 'Latest farming updates for $_newsRegion',
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          TextButton(
+                            onPressed: _testNotification,
+                            child: const Text('Test Notification'),
                           ),
                           TextButton(
-                            onPressed:
-                                _createPost,
-                            child:
-                                const Text(
-                              'Create Post',
-                            ),
+                            onPressed: _openNewsPanel,
+                            child: const Text('View All'),
                           ),
                         ],
                       ),
-
+                    ),
+                    const SizedBox(height: 10),
+                    if (_newsLoading)
                       const SizedBox(
-                        height: 4,
-                      ),
-
-                      const Text(
-                        'Ideas • tips • questions • farming experiences • suggestions',
-                        style:
-                            TextStyle(
-                          fontSize:
-                              10.5,
-                          color:
-                              AppColors
-                                  .textSecondary,
+                        height: 105,
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else if (_news.isEmpty)
+                      const _EmptyNews()
+                    else
+                      ..._news.take(3).map(
+                        (AgriNewsItem item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _NewsCard(
+                            item: item,
+                            onTap: () => _openNews(item),
+                          ),
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      if (_postsLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: 28,
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                            ),
-                          ),
-                        )
-                      else if (_posts.isEmpty)
-                        const _EmptyPosts()
-                      else
-                        ..._posts.map(
-                          (
-                            CommunityPost
-                                post,
-                          ) =>
-                              Padding(
-                            padding:
-                                const EdgeInsets.only(
-                              bottom:
-                                  10,
-                            ),
-                            child:
-                                _PostCard(
-                              post:
-                                  post,
-                              onMenu:
-                                  () =>
-                                      _showPostMenu(
-                                    post,
-                                  ),
-                              onComments:
-                                  () =>
-                                      _showComments(
-                                    post,
-                                  ),
-                              onShare:
-                                  () =>
-                                      _sharePost(
-                                    post,
-                                  ),
-                            ),
-                          ),
-                        ),
-
-                      const SizedBox(
-                        height: 14,
-                      ),
-
-                      Row(
-                        children:
-                            <Widget>[
-                          const Expanded(
-                            child:
-                                _Title(
-                              'Agriculture News',
-                            ),
-                          ),
-                          TextButton(
-                            onPressed:
-                                _openNewsPanel,
-                            child:
-                                const Text(
-                              'View All',
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      if (_newsLoading)
-                        const SizedBox(
-                          height:
-                              100,
-                          child:
-                              Center(
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth:
-                                  2,
-                            ),
-                          ),
-                        )
-                      else if (_news.isEmpty)
-                        const _EmptyNews()
-                      else
-                        ..._news
-                            .take(3)
-                            .map(
-                          (
-                            AgriNewsItem
-                                item,
-                          ) =>
-                              Padding(
-                            padding:
-                                const EdgeInsets.only(
-                              bottom:
-                                  10,
-                            ),
-                            child:
-                                _NewsCard(
-                              item:
-                                  item,
-                              onTap:
-                                  () =>
-                                      _openNews(
-                                    item,
-                                  ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ]),
                 ),
               ),
             ],
           ),
         ),
       ),
-      floatingActionButton:
-          _assistantOpen
-              ? null
-              : _FloatingButtons(
-                  onDm:
-                      _openDirectMessages,
-                  onNews:
-                      _openNewsPanel,
-                  onAssistant:
-                      _openAssistant,
-                ),
-      bottomSheet:
-          _assistantOpen
-              ? _AssistantSheet(
-                  messages:
-                      _messages,
-                  controller:
-                      _chatController,
-                  scrollController:
-                      _chatScrollController,
-                  busy:
-                      _assistantBusy,
-                  listening:
-                      _listening,
-                  onClose:
-                      _closeAssistant,
-                  onVoice:
-                      _toggleListening,
-                  onSend:
-                      _sendMessage,
-                )
-              : null,
+      floatingActionButton: _assistantOpen
+          ? null
+          : _FloatingButtons(
+              onDm: _openDirectMessages,
+              onNews: _openNewsPanel,
+              onAssistant: _openAssistant,
+            ),
+      bottomSheet: _assistantOpen
+          ? _AssistantSheet(
+              messages: _messages,
+              controller: _chatController,
+              scrollController: _chatScrollController,
+              busy: _assistantBusy,
+              listening: _listening,
+              onClose: _closeAssistant,
+              onVoice: _toggleListening,
+              onSend: _sendMessage,
+            )
+          : null,
     );
   }
 
@@ -2748,6 +2719,14 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => const DirectMessagesScreen(),
       ),
+    );
+  }
+
+  Future<void> _testNotification() async {
+    await NotificationService.showTestDailyNewsNotification(
+      title: 'AgriAI test notification is working.',
+      url: 'https://news.google.com/',
+      source: 'AgriAI Test',
     );
   }
 
@@ -2885,7 +2864,7 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$name 👋',
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -3347,35 +3326,6 @@ class _ComposerAction
 }
 
 // ============================================================================
-// TITLE
-// ============================================================================
-
-class _Title
-    extends StatelessWidget {
-  final String text;
-
-  const _Title(
-    this.text,
-  );
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Text(
-      text,
-      style:
-          const TextStyle(
-        fontSize: 17,
-        fontWeight:
-            FontWeight.w900,
-        color:
-            AppColors.textPrimary,
-      ),
-    );
-  }
-}
-
 // ============================================================================
 // POST CARD
 // ============================================================================
@@ -5324,8 +5274,7 @@ class _EmptyPosts
 // FLOATING BUTTONS
 // ============================================================================
 
-class _FloatingButtons
-    extends StatelessWidget {
+class _FloatingButtons extends StatelessWidget {
   final VoidCallback onDm;
   final VoidCallback onNews;
   final VoidCallback onAssistant;
@@ -5337,38 +5286,32 @@ class _FloatingButtons
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Column(
-      mainAxisSize:
-          MainAxisSize.min,
-      crossAxisAlignment:
-          CrossAxisAlignment.end,
-      children:
-          <Widget>[
-        _HomeQuickAction(
-          heroTag: 'agri_dm',
-          icon: Icons.forum_rounded,
-          label: 'DM',
-          onTap: onDm,
-        ),
-        const SizedBox(height: 8),
-        _HomeQuickAction(
-          heroTag: 'agri_ai',
-          icon: Icons.auto_awesome_rounded,
-          label: 'AgriAI',
-          onTap: onAssistant,
-          filled: true,
-        ),
-        const SizedBox(height: 8),
-        _HomeQuickAction(
-          heroTag: 'agri_news',
-          icon: Icons.newspaper_rounded,
-          label: 'News',
-          onTap: onNews,
-        ),
-      ],
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 2, bottom: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _HomeQuickAction(
+            heroTag: 'agri_dm',
+            icon: Icons.forum_rounded,
+            onTap: onDm,
+          ),
+          const SizedBox(height: 8),
+          _HomeQuickAction(
+            heroTag: 'agri_news',
+            icon: Icons.newspaper_rounded,
+            onTap: onNews,
+          ),
+          const SizedBox(height: 8),
+          _HomeQuickAction(
+            heroTag: 'agri_ai',
+            icon: Icons.auto_awesome_rounded,
+            onTap: onAssistant,
+            filled: true,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -5376,14 +5319,12 @@ class _FloatingButtons
 class _HomeQuickAction extends StatelessWidget {
   final String heroTag;
   final IconData icon;
-  final String label;
   final VoidCallback onTap;
   final bool filled;
 
   const _HomeQuickAction({
     required this.heroTag,
     required this.icon,
-    required this.label,
     required this.onTap,
     this.filled = false,
   });
@@ -5391,40 +5332,26 @@ class _HomeQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 118,
-      height: 48,
-      child: FloatingActionButton.extended(
+      width: 52,
+      height: 52,
+      child: FloatingActionButton(
         heroTag: heroTag,
         onPressed: onTap,
         elevation: 5,
-        backgroundColor:
-            filled ? AppColors.primary : AppColors.surface,
-        foregroundColor:
-            filled ? Colors.white : AppColors.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+        backgroundColor: filled ? AppColors.primary : AppColors.surface,
+        foregroundColor: filled ? Colors.white : AppColors.primary,
+        shape: CircleBorder(
           side: filled
               ? BorderSide.none
-              : const BorderSide(
-                  color: AppColors.border,
-                ),
+              : const BorderSide(color: AppColors.border),
         ),
-        icon: Icon(
-          icon,
-          size: 19,
-        ),
-        label: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        child: Icon(icon, size: 22),
       ),
     );
   }
 }
 
+// ============================================================================
 // ============================================================================
 // ASSISTANT SHEET
 // ============================================================================
@@ -5452,186 +5379,204 @@ class _AssistantSheet
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Material(
-      color:
-          Theme.of(context)
-              .colorScheme
-              .surface,
-      child:
-          SafeArea(
-        top:
-            false,
-        child:
-            SizedBox(
-          height:
-              MediaQuery.of(context)
-                      .size
-                      .height *
-                  0.68,
-          child:
-              Column(
-            children:
-                <Widget>[
+      color: AppColors.background,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.76,
+          child: Column(
+            children: <Widget>[
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  16,
-                  10,
-                  8,
-                  8,
-                ),
-                child:
-                    Row(
-                  children:
-                      <Widget>[
+                padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+                child: Row(
+                  children: <Widget>[
                     Container(
-                      width:
-                          38,
-                      height:
-                          38,
-                      decoration:
-                          const BoxDecoration(
-                        color:
-                            AppColors
-                                .cardGreen,
-                        shape:
-                            BoxShape.circle,
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: <Color>[
+                            AppColors.primary,
+                            AppColors.primaryDark,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.20),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      child:
-                          const Icon(
-                        Icons
-                            .auto_awesome_rounded,
-                        color:
-                            AppColors
-                                .primary,
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
-                    const SizedBox(
-                      width:
-                          10,
-                    ),
+                    const SizedBox(width: 12),
                     const Expanded(
-                      child:
-                          Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children:
-                            <Widget>[
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
                           Text(
                             'AgriAI Assistant',
-                            style:
-                                TextStyle(
-                              fontSize:
-                                  17,
-                              fontWeight:
-                                  FontWeight.w900,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
                             ),
                           ),
+                          SizedBox(height: 3),
                           Text(
-                            'Your agriculture companion',
-                            style:
-                                TextStyle(
-                              fontSize:
-                                  9,
-                              color:
-                                  AppColors
-                                      .textSecondary,
+                            'Your smart farming companion',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed:
-                          onClose,
-                      icon:
-                          const Icon(
-                        Icons
-                            .close_rounded,
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: IconButton(
+                        tooltip: 'Close',
+                        onPressed: onClose,
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          size: 20,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.cardGreen,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      listening
+                          ? Icons.graphic_eq_rounded
+                          : Icons.eco_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        listening
+                            ? 'Listening… speak your farming question'
+                            : 'Ask about crops, soil, irrigation, pests, fertilizer or weather.',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               Expanded(
-                child:
-                    ListView.builder(
-                  controller:
-                      scrollController,
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal:
-                        14,
-                  ),
-                  itemCount:
-                      messages.length,
-                  itemBuilder:
-                      (
-                    BuildContext context,
-                    int index,
-                  ) {
-                    final ChatMessage
-                        message =
-                        messages[index];
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  itemCount: messages.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final ChatMessage message = messages[index];
 
-                    return Align(
-                      alignment:
-                          message.isUser
-                              ? Alignment
-                                  .centerRight
-                              : Alignment
-                                  .centerLeft,
-                      child:
-                          Container(
-                        constraints:
-                            const BoxConstraints(
-                          maxWidth:
-                              320,
-                        ),
-                        margin:
-                            const EdgeInsets.only(
-                          bottom:
-                              8,
-                        ),
-                        padding:
-                            const EdgeInsets.symmetric(
-                          horizontal:
-                              12,
-                          vertical:
-                              9,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color:
-                              message.isUser
-                                  ? AppColors
-                                      .primary
-                                  : AppColors
-                                      .cardGreen,
-                          borderRadius:
-                              BorderRadius.circular(
-                            14,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        mainAxisAlignment: message.isUser
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          if (!message.isUser) ...<Widget>[
+                            Container(
+                              width: 28,
+                              height: 28,
+                              margin: const EdgeInsets.only(right: 7),
+                              decoration: BoxDecoration(
+                                color: AppColors.cardGreen,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 15,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                          Flexible(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 310),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 11,
+                              ),
+                              decoration: BoxDecoration(
+                                color: message.isUser
+                                    ? AppColors.primary
+                                    : Colors.white,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(17),
+                                  topRight: const Radius.circular(17),
+                                  bottomLeft: Radius.circular(
+                                    message.isUser ? 17 : 5,
+                                  ),
+                                  bottomRight: Radius.circular(
+                                    message.isUser ? 5 : 17,
+                                  ),
+                                ),
+                                border: message.isUser
+                                    ? null
+                                    : Border.all(color: AppColors.border),
+                                boxShadow: <BoxShadow>[
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.035),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                message.text,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w500,
+                                  color: message.isUser
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        child:
-                            Text(
-                          message.text,
-                          style:
-                              TextStyle(
-                            fontSize:
-                                10.5,
-                            height:
-                                1.35,
-                            color:
-                                message.isUser
-                                    ? Colors.white
-                                    : AppColors
-                                        .textPrimary,
-                          ),
-                        ),
+                        ],
                       ),
                     );
                   },
@@ -5639,123 +5584,121 @@ class _AssistantSheet
               ),
               if (busy)
                 const Padding(
-                  padding:
-                      EdgeInsets.symmetric(
-                    horizontal:
-                        16,
-                    vertical:
-                        4,
-                  ),
-                  child:
-                      Align(
-                    alignment:
-                        Alignment.centerLeft,
-                    child:
-                        Text(
-                      'AgriAI is thinking…',
-                      style:
-                          TextStyle(
-                        fontSize:
-                            9,
-                        color:
-                            AppColors
-                                .textSecondary,
+                  padding: EdgeInsets.fromLTRB(18, 0, 18, 8),
+                  child: Row(
+                    children: <Widget>[
+                      SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                    ),
+                      SizedBox(width: 8),
+                      Text(
+                        'AgriAI is thinking…',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  12,
-                  6,
-                  12,
-                  10,
-                ),
-                child:
-                    Row(
-                  children:
-                      <Widget>[
-                    IconButton(
-                      tooltip:
-                          'Voice input',
-                      onPressed:
-                          onVoice,
-                      icon:
-                          Icon(
-                        listening
-                            ? Icons
-                                .mic_rounded
-                            : Icons
-                                .mic_none_rounded,
-                        color:
-                            listening
-                                ? AppColors
-                                    .primary
-                                : AppColors
-                                    .textSecondary,
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: listening
+                            ? AppColors.primary
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: listening
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        tooltip: listening
+                            ? 'Stop listening'
+                            : 'Voice input',
+                        onPressed: onVoice,
+                        icon: Icon(
+                          listening
+                              ? Icons.stop_rounded
+                              : Icons.mic_none_rounded,
+                          color: listening
+                              ? Colors.white
+                              : AppColors.primary,
+                          size: 22,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child:
-                          TextField(
-                        controller:
-                            controller,
-                        minLines:
-                            1,
-                        maxLines:
-                            3,
-                        textInputAction:
-                            TextInputAction.send,
-                        onSubmitted:
-                            (_) =>
-                                onSend(),
-                        decoration:
-                            InputDecoration(
-                          hintText:
-                              'Ask AgriAI…',
-                          filled:
-                              true,
-                          fillColor:
-                              AppColors
-                                  .background,
-                          border:
-                              OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(
-                              18,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: TextField(
+                          controller: controller,
+                          minLines: 1,
+                          maxLines: 4,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: const InputDecoration(
+                            hintText: 'Ask anything about your farm…',
+                            hintStyle: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w500,
                             ),
-                            borderSide:
-                                BorderSide.none,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 13,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(
-                      width:
-                          6,
-                    ),
-                    IconButton(
-                      tooltip:
-                          'Send',
-                      onPressed:
-                          busy
-                              ? null
-                              : onSend,
-                      style:
-                          IconButton.styleFrom(
-                        backgroundColor:
-                            AppColors
-                                .primary,
-                        foregroundColor:
-                            Colors.white,
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.20),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      icon:
-                          const Icon(
-                        Icons
-                            .arrow_upward_rounded,
-                        size:
-                            20,
+                      child: IconButton(
+                        tooltip: 'Send',
+                        onPressed: busy ? null : onSend,
+                        icon: const Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Colors.white,
+                          size: 23,
+                        ),
                       ),
                     ),
                   ],
@@ -5768,10 +5711,6 @@ class _AssistantSheet
     );
   }
 }
-
-// ============================================================================
-// DATA MODELS
-// ============================================================================
 
 class WeatherSnapshot {
   final double temperature;
@@ -5859,4 +5798,447 @@ class ChatMessage {
     required this.isUser,
     required this.text,
   });
+}
+
+class _HomeSectionTitle extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  const _HomeSectionTitle({
+    required this.title,
+    this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (subtitle != null) ...<Widget>[
+                const SizedBox(height: 3),
+                Text(
+                  subtitle!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        ?trailing,
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// NOTIFICATIONS SHEET
+// ============================================================================
+
+class _NotificationsSheet extends StatelessWidget {
+  const _NotificationsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.82,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(28),
+        ),
+      ),
+      child: Column(
+        children: <Widget>[
+          const SizedBox(height: 10),
+
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.black12,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              18,
+              12,
+              10,
+            ),
+            child: Row(
+              children: <Widget>[
+                const Expanded(
+                  child: Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+
+                TextButton(
+                  onPressed: () async {
+                    await NotificationService.markAllAsRead();
+                  },
+                  child: const Text(
+                    'Mark all read',
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          Expanded(
+            child: StreamBuilder<List<AppNotificationModel>>(
+              stream:
+                  NotificationService.notificationsStream(),
+              builder: (
+                BuildContext context,
+                AsyncSnapshot<List<AppNotificationModel>>
+                    snapshot,
+              ) {
+                if (snapshot.connectionState ==
+                    ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Unable to load notifications.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final List<AppNotificationModel>
+                    notifications =
+                    snapshot.data ??
+                        <AppNotificationModel>[];
+
+                if (notifications.isEmpty) {
+                  return _EmptyNotifications();
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(
+                    16,
+                    14,
+                    16,
+                    24,
+                  ),
+                  itemCount: notifications.length,
+                  separatorBuilder: (
+                    BuildContext context,
+                    int index,
+                  ) {
+                    return const SizedBox(height: 8);
+                  },
+                  itemBuilder: (
+                    BuildContext context,
+                    int index,
+                  ) {
+                    final AppNotificationModel notification =
+                        notifications[index];
+
+                    return _NotificationTile(
+                      notification: notification,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  final AppNotificationModel notification;
+
+  const _NotificationTile({
+    required this.notification,
+  });
+
+  IconData _iconForType(NotificationType type) {
+    switch (type) {
+      case NotificationType.weather:
+        return Icons.cloud_rounded;
+
+      case NotificationType.irrigation:
+        return Icons.water_drop_rounded;
+
+      case NotificationType.disease:
+        return Icons.health_and_safety_rounded;
+
+      case NotificationType.yield:
+        return Icons.agriculture_rounded;
+
+      case NotificationType.soil:
+        return Icons.grass_rounded;
+
+      case NotificationType.fertilizer:
+        return Icons.eco_rounded;
+
+      case NotificationType.connectionRequest:
+        return Icons.person_add_rounded;
+
+      case NotificationType.connectionAccepted:
+        return Icons.people_alt_rounded;
+
+      case NotificationType.message:
+        return Icons.chat_bubble_rounded;
+
+      case NotificationType.like:
+        return Icons.favorite_rounded;
+
+      case NotificationType.comment:
+        return Icons.comment_rounded;
+
+      case NotificationType.general:
+        return Icons.notifications_rounded;
+    }
+  }
+
+  Future<void> _markRead() async {
+    if (!notification.isRead) {
+      await NotificationService.markAsRead(
+        notification.id,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool unread = notification.isUnread;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: _markRead,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: unread
+              ? AppColors.primary.withValues(alpha: 0.07)
+              : Colors.grey.withValues(alpha: 0.035),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: unread
+                ? AppColors.primary.withValues(alpha: 0.18)
+                : Colors.grey.withValues(alpha: 0.10),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _iconForType(notification.type),
+                color: AppColors.primary,
+                size: 22,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: unread
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+
+                      if (unread)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  Text(
+                    notification.message,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+
+                  const SizedBox(height: 7),
+
+                  Row(
+                    children: <Widget>[
+                      Text(
+                        notification.typeName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      Text(
+                        _formatNotificationTime(
+                          notification.createdAt,
+                        ),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatNotificationTime(DateTime dateTime) {
+    final Duration difference =
+        DateTime.now().difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    }
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    }
+
+    if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    }
+
+    if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    }
+
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+  }
+}
+
+class _EmptyNotifications extends StatelessWidget {
+  const _EmptyNotifications();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_none_rounded,
+                size: 38,
+                color: AppColors.primary,
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            const Text(
+              'No notifications yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'You will see updates about your farm, '
+              'connections and activity here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

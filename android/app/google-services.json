@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1017607357742-bjipkdaiqupv4a969qq6q8cp42ce09fn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.agriai",
+            "certificate_hash": "9753b15b3ebe4950acb1800ce88bc2be9547aa89"
+          }
+        },
+        {
           "client_id": "1017607357742-hl9uksg4jgn3gurvco781pue31vhp727.apps.googleusercontent.com",
           "client_type": 3
         }

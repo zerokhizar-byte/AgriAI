@@ -1,8 +1,9 @@
 import 'dart:async';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../language_selection_screen.dart';
 import '../../navigation/main_navigation.dart';
@@ -21,16 +22,34 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  VideoPlayerController? _videoController;
+
+  bool _videoReady = false;
+  bool _videoFailed = false;
+
   @override
   void initState() {
     super.initState();
+
+    _enterFullScreen();
+
     unawaited(_startApp());
   }
 
-  Future<void> _startApp() async {
-    await Future<void>.delayed(
-      const Duration(seconds: 2),
+  void _enterFullScreen() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.immersiveSticky,
     );
+  }
+
+  void _restoreSystemUI() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.edgeToEdge,
+    );
+  }
+
+  Future<void> _startApp() async {
+    await _initializeAndPlayVideo();
 
     if (!mounted) {
       return;
@@ -39,7 +58,85 @@ class _SplashScreenState extends State<SplashScreen> {
     await _checkUserAndNavigate();
   }
 
+  Future<void> _initializeAndPlayVideo() async {
+    try {
+      final VideoPlayerController controller =
+          VideoPlayerController.asset(
+        'assets/animations/agriai_logo.mp4',
+      );
+
+      _videoController = controller;
+
+      await controller.initialize();
+
+      if (!mounted) {
+        return;
+      }
+
+      await controller.setLooping(false);
+
+      setState(() {
+        _videoReady = true;
+      });
+
+      await controller.play();
+
+      await _waitForVideoCompletion();
+    } catch (error, stackTrace) {
+      debugPrint(
+        'AgriAI Splash video error: $error',
+      );
+
+      debugPrint(
+        stackTrace.toString(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _videoFailed = true;
+      });
+
+      await Future<void>.delayed(
+        const Duration(seconds: 2),
+      );
+    }
+  }
+
+  Future<void> _waitForVideoCompletion() async {
+    final VideoPlayerController? controller =
+        _videoController;
+
+    if (controller == null) {
+      return;
+    }
+
+    while (mounted) {
+      final VideoPlayerValue value =
+          controller.value;
+
+      if (!value.isInitialized) {
+        await Future<void>.delayed(
+          const Duration(milliseconds: 100),
+        );
+        continue;
+      }
+
+      if (value.position >= value.duration) {
+        break;
+      }
+
+      await Future<void>.delayed(
+        const Duration(milliseconds: 100),
+      );
+    }
+  }
+
   Future<void> _checkUserAndNavigate() async {
+    _restoreSystemUI();
+
     final SharedPreferences prefs =
         await SharedPreferences.getInstance();
 
@@ -104,73 +201,81 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme =
-        Theme.of(context);
+    final VideoPlayerController? controller =
+        _videoController;
 
     return Scaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
-      body: SafeArea(
+      backgroundColor: Colors.black,
+      body: _buildSplashContent(controller),
+    );
+  }
+
+  Widget _buildSplashContent(
+    VideoPlayerController? controller,
+  ) {
+    if (_videoFailed) {
+      return _buildFallbackSplash();
+    }
+
+    if (!_videoReady ||
+        controller == null ||
+        !controller.value.isInitialized) {
+      return const SizedBox.expand(
+        child: ColoredBox(
+          color: Colors.black,
+        ),
+      );
+    }
+
+    final Size videoSize =
+        controller.value.size;
+
+    if (videoSize.width <= 0 ||
+        videoSize.height <= 0) {
+      return const SizedBox.expand(
+        child: ColoredBox(
+          color: Colors.black,
+        ),
+      );
+    }
+
+    return SizedBox.expand(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: videoSize.width,
+          height: videoSize.height,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackSplash() {
+    return const SizedBox.expand(
+      child: ColoredBox(
+        color: Colors.black,
         child: Center(
-          child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
-            children: <Widget>[
-              Image.asset(
-                'assets/images/agriai_logo.png',
-                width: 150,
-                height: 150,
-                fit: BoxFit.contain,
-                errorBuilder: (
-                  BuildContext context,
-                  Object error,
-                  StackTrace? stackTrace,
-                ) {
-                  return Icon(
-                    Icons.agriculture_rounded,
-                    size: 100,
-                    color:
-                        theme.colorScheme.primary,
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'AgriAI',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight:
-                      FontWeight.bold,
-                  color:
-                      theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Smart Agriculture',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: theme
-                      .colorScheme
-                      .onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 35),
-              SizedBox(
-                width: 30,
-                height: 30,
-                child:
-                    CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: theme
-                      .colorScheme
-                      .primary,
-                ),
-              ),
-            ],
+          child: Image(
+            image: AssetImage(
+              'assets/images/agriai_logo.png',
+            ),
+            width: 150,
+            height: 150,
+            fit: BoxFit.contain,
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _restoreSystemUI();
+
+    _videoController?.dispose();
+
+    super.dispose();
   }
 }
