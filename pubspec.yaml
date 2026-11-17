@@ -43,7 +43,7 @@ dependencies:
   # Facebook authentication
   flutter_facebook_auth: ^7.2.0
   
-  flutter_local_notifications: ^22.3.1
+  flutter_local_notifications: ^23.0.2
   # GPS / device location
   geolocator: ^14.0.2
   
