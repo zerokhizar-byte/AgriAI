@@ -156,6 +156,8 @@ flutter test
 
 ## 🔐 Security and configuration
 
+Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. For ordinary setup and usage questions, see [SUPPORT.md](SUPPORT.md).
+
 Before publishing or deploying:
 
 - Never commit service-account JSON files, private keys, keystores, signing passwords, access tokens, or unredacted environment files.
@@ -185,7 +187,7 @@ Before publishing or deploying:
 
 ## 🤝 Contributing
 
-Contributions, bug reports, and thoughtful suggestions are welcome.
+Contributions, bug reports, and thoughtful suggestions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and use the GitHub issue and pull-request templates.
 
 1. Fork the repository.
 2. Create a feature branch.
@@ -197,7 +199,7 @@ Please do not include private credentials, proprietary datasets, or personal inf
 
 ## 📄 License
 
-No license has been added to this repository yet. Until a license is included, the source is not automatically granted open-source reuse permissions. Add a license file before inviting reuse or redistribution.
+This project is distributed under the **MIT License**. See [LICENSE](LICENSE) for the complete license text and conditions. Third-party packages, datasets, model weights, images, and other external assets may have separate licenses or usage terms; those terms continue to apply.
 
 ## 👨‍💻 Project
 
