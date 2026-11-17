@@ -54,7 +54,7 @@ dependencies:
   share_plus: ^13.3.0
   firebase_messaging: ^16.7.0
   flutter_onnxruntime: ^1.8.3
-  image: ^4.10.1
+  image: ^4.13.1
 
 dev_dependencies:
   flutter_test:
