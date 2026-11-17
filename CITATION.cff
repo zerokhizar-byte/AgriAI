@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use or reference AgriAI, please cite this software."
+title: "AgriAI: Smart Agriculture Assistant"
+type: software
+authors:
+  - family-names: Kachi
+    given-names: "Mohd Khizar"
+repository-code: "https://github.com/zerokhizar-byte/AgriAI"
+license: MIT
