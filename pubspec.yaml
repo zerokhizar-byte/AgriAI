@@ -24,7 +24,7 @@ dependencies:
   url_launcher: ^6.3.2
 
   # Image and video selection
-  image_picker: ^1.2.3
+  image_picker: ^1.2.4
 
   # Voice input
   speech_to_text: ^7.3.0
