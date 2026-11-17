@@ -14,6 +14,8 @@
   <img src="https://img.shields.io/badge/AI-On--device%20ONNX-6B8E23" />
   <img src="https://img.shields.io/badge/Backend-Firebase-FFCA28?logo=firebase&logoColor=black" />
   <img src="https://img.shields.io/badge/Status-Under%20Development-orange" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" />
+  <a href="https://github.com/zerokhizar-byte/AgriAI/actions/workflows/flutter-ci.yml"><img src="https://github.com/zerokhizar-byte/AgriAI/actions/workflows/flutter-ci.yml/badge.svg" alt="Flutter CI" /></a>
 </p>
 
 AgriAI is a Flutter-based smart agriculture application being developed to help farmers and agriculture learners access crop-related information and AI-assisted insights from a mobile interface. The project brings together machine-learning inference, Firebase-backed application services, and practical farming tools.
@@ -174,6 +176,18 @@ Before publishing or deploying:
 - Disease predictions can be affected by lighting, blur, background clutter, leaf age, and crop variety.
 - Yield estimates are only as reliable as the input measurements and the training data's representativeness.
 - Validate models on independent, real-world field data before using predictions for operational or financial decisions.
+
+## 📚 Project documentation
+
+- [Architecture overview](docs/ARCHITECTURE.md)
+- [Disease detection model card](docs/DISEASE_MODEL_CARD.md)
+- [Data and privacy notes](docs/DATA_AND_PRIVACY.md)
+- [Changelog](CHANGELOG.md)
+- [Citation metadata](CITATION.cff)
+- [Contributing guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Support guide](SUPPORT.md)
 
 ## 🗺️ Development roadmap
 
